@@ -62,7 +62,7 @@ bool GetFile(fs::path const& path, Data& output)
 
 	// Read file in array
 	fin.seekg(0, std::ios::beg);
-	fin.read((char*)&output[0], fileSize);
+	fin.read((char*)output.data(), fileSize);
 
 	// Close
 	fin.close();
@@ -122,6 +122,11 @@ size_t SkipUntil(std::string const& data, size_t& cursor, char ch)
 	for (; cursor < data.size() && data[cursor] != ch; ++cursor, ++count);
 	if (cursor < data.size()) ++cursor;
 	return count;
+}
+
+bool IsLetter(char ch)
+{
+	return ('A' <= ch && ch <= 'Z') || ('a' <= ch && ch <= 'z');
 }
 
 bool IsHttpMethod(std::string const& method)
@@ -245,6 +250,14 @@ bool ParseTcp(Data const& data, size_t pos, size_t size)
 	pos += TCP_HEADER_LEN;
 	size -= TCP_HEADER_LEN;
 
+	while (size != 0 && pos < data.size() && !IsLetter(data[pos])) {
+		++pos;
+		--size;
+	}
+	if (size == 0 || pos >= data.size()) {
+		return false;
+	}
+
 	std::string payload;
 	std::copy(data.begin() + pos, data.begin() + pos + size, std::back_inserter(payload));
 
@@ -252,6 +265,7 @@ bool ParseTcp(Data const& data, size_t pos, size_t size)
 	if (ParseHttp(payload, res)) {
 		if (!res.FormData.empty()) {
 			if (params.uri.empty() || res.Uri.find(params.uri) != std::string::npos) {
+				std::cout << "URI = " << res.Uri << std::endl;
 				if (!params.fields.empty()) {
 					std::cout << "Method = " << res.Method << std::endl;
 					for (std::string const& field : params.fields) {
